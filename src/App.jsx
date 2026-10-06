@@ -23,9 +23,6 @@ async function fetchWeatherForLocation(latitude, longitude) {
 function App() {
   const [weather, setWeather] = useState(null);
   const [cityName, setCityName] = useState(DEFAULT_CITY);
-
-  const [coordinates, setCoordinates] = useState(DEFAULT_LOCATION);
-
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -52,9 +49,6 @@ function App() {
       return;
     }
 
-    setIsLoading(true);
-    setErrorMessage("");
-
     try {
       const response = await fetch(
         `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
@@ -73,13 +67,7 @@ function App() {
       }
 
       const result = data.results[0];
-
-      setCityName(result.name || trimmedCity);
-
-      setCoordinates({
-        latitude: result.latitude,
-        longitude: result.longitude,
-      });
+      await loadWeather(result.name || trimmedCity, result.latitude, result.longitude);
     } catch (error) {
       setErrorMessage(
         error.message || "Unable to search for that city."
@@ -89,32 +77,39 @@ function App() {
   }
 
   useEffect(() => {
-    async function fetchCurrentWeather() {
+    let isMounted = true;
+
+    async function fetchInitialWeather() {
+      setIsLoading(true);
+
       try {
         const data = await fetchWeatherForLocation(
-          coordinates.latitude,
-          coordinates.longitude
+          DEFAULT_LOCATION.latitude,
+          DEFAULT_LOCATION.longitude
         );
 
-        setWeather(data);
-        setErrorMessage("");
+        if (isMounted) {
+          setWeather(data);
+          setCityName(DEFAULT_CITY);
+          setErrorMessage("");
+        }
       } catch (error) {
-        setErrorMessage(
-          error.message || "Unable to fetch weather."
-        );
+        if (isMounted) {
+          setErrorMessage(error.message || "Unable to fetch weather.");
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
-    fetchCurrentWeather();
-
-    const interval = setInterval(fetchCurrentWeather, 600000);
+    fetchInitialWeather();
 
     return () => {
-      clearInterval(interval);
+      isMounted = false;
     };
-  }, [coordinates]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#f8fbff_0%,_#dfeaf7_35%,_#cbd5e1_100%)] px-4 py-6 text-slate-900">
